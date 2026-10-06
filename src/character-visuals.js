@@ -109,8 +109,9 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         if(look.role==='police'){
             render(model,'Police cap',cube,mats.police,0,1.72,-.02,.34,.08,.32);render(model,'Police hi-vis vest',cube,mats.yellow,0,1.05,-.15,.34,.35,.035);
             render(model,'Police duty belt',cube,mats.gun,0,.73,0,.41,.065,.29);
-            joints.tool=render(joints.armR.socket,'Police pistol',cube,mats.gun,0,0,-.17,.07,.08,.3);
-            joints.flash=render(joints.armR.socket,'Police muzzle flash',headMesh,flashMaterial,0,0,-.40,.10,.10,.20);joints.flash.enabled=false;
+            joints.tool=render(joints.armR.socket,'Police pistol',cube,mats.gun,0,-.17,0,.07,.08,.3);
+            joints.tool.setLocalEulerAngles(-90,0,0);
+            joints.flash=render(joints.armR.socket,'Police muzzle flash',headMesh,flashMaterial,0,-.40,0,.10,.10,.20);joints.flash.setLocalEulerAngles(-90,0,0);joints.flash.enabled=false;
         }else if(look.role==='firefighter'){
             render(model,'Firefighter helmet',headMesh,mats.yellow,0,1.72,0,.37,.20,.37);
             for(const y of [.89,1.18])render(model,'Reflective jacket tape',cube,mats.yellow,0,y,-.15,.38,.055,.045);
@@ -146,9 +147,11 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         root.detail.setLocalPosition(0,pose.bob,0);root.detail.setLocalEulerAngles(pose.lean,0,0);
         j.legL.joint.setLocalEulerAngles(pose.legL,0,0);j.legR.joint.setLocalEulerAngles(pose.legR,0,0);j.legL.lower.setLocalEulerAngles(-pose.kneeL,0,0);j.legR.lower.setLocalEulerAngles(-pose.kneeR,0,0);
         j.armL.joint.setLocalEulerAngles(pose.scream?110:pose.armL,0,zombie?-9:0);j.armR.joint.setLocalEulerAngles(pose.scream?105:pose.armR,0,zombie?12:0);
-        j.armL.lower.setLocalEulerAngles(-25,0,0);j.armR.lower.setLocalEulerAngles(-25,0,0);
+        // Downward upper arms bend towards local -Z (the character's front).
+        // Negative X here bent the forearms behind the elbows.
+        j.armL.lower.setLocalEulerAngles(zombie?18:25,0,0);j.armR.lower.setLocalEulerAngles(zombie?18:25,0,0);
         j.head.setLocalEulerAngles(zombie?Math.sin(pose.phase*1.7)*5:0,pose.headYaw,0);j.hairCap.setLocalEulerAngles(0,pose.headYaw,0);
-        if(pose.combat){j.armR.joint.setLocalEulerAngles(80+pose.attack*10,0,0);j.armR.lower.setLocalEulerAngles(-12,0,0);j.armL.joint.setLocalEulerAngles(60,0,-20);}
+        if(pose.combat){j.armR.joint.setLocalEulerAngles(78+pose.attack*5,0,0);j.armR.lower.setLocalEulerAngles(12,0,0);j.armL.joint.setLocalEulerAngles(60,0,-20);}
         if(pose.axe)j.armR.joint.setLocalEulerAngles(145-pose.attack*170,0,0);
         if(zombie&&pose.attack){j.armL.joint.setLocalEulerAngles(90,0,-10);j.armR.joint.setLocalEulerAngles(100,0,15);j.head.setLocalEulerAngles(-15,0,0);}
         if(j.tool)j.tool.enabled=Boolean(a.weapon);

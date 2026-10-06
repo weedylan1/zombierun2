@@ -72,6 +72,16 @@ for(const age of ['adult','child'])for(const type of ['civilian','zombie','polic
     assert.equal(root.appearance,identity);assert.equal(root.getPosition().equals(position),true);root.destroy();
 }
 const idle=locomotionPose({id:1,type:'civilian',walkDistance:0,lastScream:-99},.1,10),flee=locomotionPose({id:1,type:'civilian',state:'flee',walkDistance:.5,lastScream:-99},.1,10),zombie=locomotionPose({id:1,type:'zombie',walkDistance:.2,lastScream:-99,lastVisualAttack:10},.1,10);
+for(const type of ['civilian','police','firefighter','zombie'])for(const state of ['wander','flee','combat']){
+    const entity=visuals.create(type,'adult','m',skin);app.root.addChild(entity);
+    visuals.update({id:1,entity,type,state,walkDistance:0,lastScream:-99,lastVisualAttack:-99,weapon:type==='police'?'gun':null},.1,10,{x:0,z:0},QUALITY_PROFILES.high);
+    for(const arm of [entity.joints.armL,entity.joints.armR]){
+        assert(arm.lower.getLocalEulerAngles().x>0,'Elbow must bend towards the front');
+        const handInUpper=arm.joint.getWorldTransform().clone().invert().transformPoint(arm.end.getPosition());
+        assert(handInUpper.z<0,'Hand must be in front of its upper-arm plane');
+    }
+    entity.destroy();
+}
 assert(Math.abs(flee.legL)>Math.abs(idle.legL));assert.equal(flee.lean,-9);assert(zombie.armL>50);assert.equal(zombie.lean,-24);assert(zombie.legL!==-zombie.legR);assert.equal(zombie.attack,1);
 
 // Execute the actual game steering with real engine lookAt/transforms, rather
