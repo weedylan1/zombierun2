@@ -6,4 +6,12 @@ export const QUALITY_PROFILES = Object.freeze({
 export function resolveQuality(selected,xr=false,mobile=false){return QUALITY_PROFILES[xr?'quest':selected==='auto'?(mobile?'quest':'high'):selected]||QUALITY_PROFILES.low;}
 // Rendering never removes an actor or changes simulation state.
 export function characterLOD(distance,profile){return distance<profile.near?0:distance<profile.middle?1:distance<profile.cull?2:3;}
+export function stableCharacterLOD(distance,profile,previous){
+    if(previous===undefined)return characterLOD(distance,profile);
+    const limits=[profile.near,profile.middle,profile.cull];let lod=previous;
+    // Separate entry/exit distances prevent repeated swaps at a boundary.
+    while(lod<3&&distance>limits[lod]+2)lod++;
+    while(lod>0&&distance<limits[lod-1]-2)lod--;
+    return lod;
+}
 export function seededRandom(seed=94187){return ()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}

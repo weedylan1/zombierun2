@@ -1,4 +1,4 @@
-import {characterLOD} from './quality-profiles.js';
+import {stableCharacterLOD} from './quality-profiles.js';
 
 export function locomotionPose(a,dt,now){
     const distance=a.walkDistance||0,speed=distance/Math.max(.001,dt),moving=speed>.03,zombie=a.type==='zombie',panic=a.state==='flee';
@@ -56,14 +56,19 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         const t=new pc.Texture(app.graphicsDevice,{width:128,height:128,mipmaps:true});t.setSource(canvas);m.diffuseMap=t;m.gloss=.02;m.update();damagedClothes.set(base.id,m);return m;
     }
     function proxyMesh(zombie=false){
-        const positions=[],indices=[];
+        const positions=[],indices=[],uvs=[];
         const cubePoints=[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]];
-        const triangles=[0,2,1,0,3,2,4,5,6,4,6,7,0,4,7,0,7,3,1,2,6,1,6,5,3,7,6,3,6,2,0,1,5,0,5,4];
+        const faces=[[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]];
         const parts=zombie?[[0,.94,-.12,.43,.65,.32],[-.13,.34,.06,.13,.65,.16],[.13,.30,.12,.13,.56,.16],[-.29,1.08,-.40,.12,.15,.65],[.29,.99,-.34,.12,.15,.54]]:[[0,.95,0,.43,.65,.26],[-.13,.34,0,.13,.65,.16],[.13,.34,0,.13,.65,.16],[-.29,.90,0,.11,.60,.12],[.29,.90,0,.11,.60,.12]];
         for(const [x,y,z,w,h,d] of parts){
-            const offset=positions.length/3;for(const p of cubePoints)positions.push(x+p[0]*w,y+p[1]*h,z+p[2]*d);indices.push(...triangles.map(i=>i+offset));
+            // Each face has UVs: distant clothes must show the same damage map
+            // as near clothes, rather than reverting to a pristine flat colour.
+            for(const face of faces){const offset=positions.length/3;
+                for(const i of face){const p=cubePoints[i];positions.push(x+p[0]*w,y+p[1]*h,z+p[2]*d);}
+                uvs.push(0,0,0,1,1,1,1,0);indices.push(offset,offset+1,offset+2,offset,offset+2,offset+3);
+            }
         }
-        const m=new pc.Mesh(app.graphicsDevice);m.setPositions(positions);m.setNormals(pc.calculateNormals(positions,indices));m.setIndices(indices);m.update();return m;
+        const m=new pc.Mesh(app.graphicsDevice);m.setPositions(positions);m.setNormals(pc.calculateNormals(positions,indices));m.setUvs(0,uvs);m.setIndices(indices);m.update();return m;
     }
     const proxy=proxyMesh(),zombieProxy=proxyMesh(true);
     proxy.incRefCount();zombieProxy.incRefCount();
@@ -73,7 +78,7 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         const scale=root.appearance.height/1.72;
         root.proxyBody=render(root,'Body',proxy,body,0,0,0,scale,scale,scale);
         root.proxyHead=render(root,'Head',headMesh,type==='zombie'?mats.zombie:skin,0,1.53*scale,0,.23*scale,.30*scale,.24*scale);
-        root.visualLOD=2;return root;
+        root.visualLOD=undefined;return root;
     }
     function detailed(root){
         const look=root.appearance,h=look.height,scale=h/1.72,body=look.body,skin=look.skin;
@@ -110,9 +115,9 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
     }
     function update(a,dt,now,position,profile){
         const root=a.entity;if(!root.appearance){a.walkDistance=0;return;}
-        const p=root.getPosition(),d=Math.hypot(p.x-position.x,p.z-position.z),lod=characterLOD(d,profile);
+        const p=root.getPosition(),d=Math.hypot(p.x-position.x,p.z-position.z),lod=stableCharacterLOD(d,profile,root.visualLOD);
         const zombie=a.type==='zombie',skin=zombie?mats.zombie:root.appearance.skin;
-        setMaterial(root.proxyHead,skin);setMaterial(root.proxyBody,zombie?damagedMaterial(root.appearance.body):root.appearance.body);
+        setMaterial(root.proxyHead,faceMaterial(skin));setMaterial(root.proxyBody,zombie?damagedMaterial(root.appearance.body):root.appearance.body);
         root.proxyBody.render.meshInstances[0].mesh=zombie?zombieProxy:proxy;
         const scale=root.appearance.height/1.72;
         root.proxyHead.setLocalPosition(0,(zombie?1.38:1.53)*scale,(zombie?-.32:0)*scale);

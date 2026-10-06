@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as engine from 'playcanvas';
 import {surfaceData,createPBRLibrary} from './src/procedural-surfaces.js';
-import {QUALITY_PROFILES,resolveQuality,characterLOD,seededRandom} from './src/quality-profiles.js';
+import {QUALITY_PROFILES,resolveQuality,characterLOD,stableCharacterLOD,seededRandom} from './src/quality-profiles.js';
 import {createCharacterVisuals,locomotionPose} from './src/character-visuals.js';
 import {createTownArt} from './src/town-art.js';
 import {arrangeStreetBenchmark} from './src/street-benchmark.js';
@@ -14,6 +14,13 @@ for(const kind of ['road','wet','pavement','brick','stone','metal','wood']){
 }
 assert.equal(resolveQuality('high',true).label,'Quest / Mobile');assert.equal(resolveQuality('auto',false,true),QUALITY_PROFILES.quest);
 for(const p of Object.values(QUALITY_PROFILES)){assert.equal(characterLOD(0,p),0);assert.equal(characterLOD(p.near+1,p),1);assert.equal(characterLOD(p.middle+1,p),2);assert.equal(characterLOD(p.cull+1,p),3);}
+for(const p of Object.values(QUALITY_PROFILES))for(const [i,boundary] of [p.near,p.middle,p.cull].entries()){
+    for(let frame=0;frame<100;frame++){
+        assert.equal(stableCharacterLOD(boundary+(frame%2?.2:-.2),p,i),i);
+        assert.equal(stableCharacterLOD(boundary+(frame%2?.2:-.2),p,i+1),i+1);
+    }
+    assert.equal(stableCharacterLOD(boundary+2.1,p,i),i+1);assert.equal(stableCharacterLOD(boundary-2.1,p,i+1),i);
+}
 assert.equal(resolveQuality('high').shadows,true);assert.equal(resolveQuality('quest').shadows,false);
 const r=seededRandom(21),r2=seededRandom(21);for(let i=0;i<100;i++)assert.equal(r(),r2());
 
@@ -29,6 +36,7 @@ class Entity extends engine.GraphNode {
     destroy(){for(const c of [...this.children])c.destroy();this.remove();for(const mi of this.render?.meshInstances||[])mi.destroy();}
 }
 const pc={...engine,Entity},app={graphicsDevice:device,root:new Entity('Scene')};
+app.root._enabledInHierarchy=true;
 const mat=(r=.3,g=.3,b=.3)=>{const m=new engine.StandardMaterial();m.diffuse=new engine.Color(r,g,b);m.update();return m;};
 const mats=Object.fromEntries(['black','axe','gun','zombie','police','fire','yellow'].map(k=>[k,mat()])),skin=mat(.8,.6,.4),clothes=[mat(.2,.3,.4)],visuals=createCharacterVisuals(pc,app,mats,clothes,a=>a[0]);
 for(const age of ['adult','child'])for(const type of ['civilian','zombie','police','firefighter']){
@@ -36,14 +44,22 @@ for(const age of ['adult','child'])for(const type of ['civilian','zombie','polic
     const actor={id:42,entity:root,type,walkDistance:.1,state:'wander',lastScream:-99,weapon:type==='police'?'gun':type==='firefighter'?'axe':null};
     visuals.update(actor,.1,10,{x:2,z:3},QUALITY_PROFILES.high);assert(root.detail);assert.equal(root.visualLOD,0);assert.equal(Object.keys(root.limbs).length,4);assert.equal(actor.walkDistance,0);
     let triangles=0;root.detail.forEach(e=>{for(const mi of e.render?.meshInstances||[])triangles+=mi.mesh.primitive[0].count/3;});assert(triangles<5000);
-    actor.type='zombie';actor.walkDistance=.1;visuals.update(actor,.1,11,{x:2,z:3},QUALITY_PROFILES.high);assert.equal(root.appearance,identity);assert.equal(root.proxyHead.render.material,mats.zombie);assert.equal(root.getPosition().equals(position),true);
+    actor.type='zombie';actor.walkDistance=.1;visuals.update(actor,.1,11,{x:2,z:3},QUALITY_PROFILES.high);assert.equal(root.appearance,identity);assert.equal(root.proxyHead.render.material,root.joints.head.render.material);assert.equal(root.getPosition().equals(position),true);
     assert.equal(root.joints.neck.render.material,mats.zombie);assert.equal(root.joints.armL.end.render.material,mats.zombie);
     assert.equal(root.joints.head.render.meshInstances[0].material,root.joints.head.render.material);
-    assert.equal(root.joints.neck.render.meshInstances[0].material,mats.zombie);assert.equal(root.proxyHead.render.meshInstances[0].material,mats.zombie);
+    assert.equal(root.joints.neck.render.meshInstances[0].material,mats.zombie);assert.equal(root.proxyHead.render.meshInstances[0].material,root.joints.head.render.meshInstances[0].material);
     assert.equal(root.joints.torso.render.meshInstances[0].material,root.joints.torso.render.material);
     assert.notEqual(root.joints.torso.render.material,identity.body);assert(root.joints.torso.render.material.diffuse.equals(identity.body.diffuse));
     assert(root.joints.armL.end.getPosition().z<root.joints.armL.joint.getPosition().z,'Zombie hands must reach forward');
     const zombieMesh=root.proxyBody.render.meshInstances[0].mesh;
+    const face=root.joints.head.render.meshInstances[0].material,damaged=root.joints.torso.render.meshInstances[0].material,uvs=[];zombieMesh.getUvs(0,uvs);assert.equal(uvs.length,zombieMesh.vertexBuffer.numVertices*2);assert(new Set(uvs).size>1);
+    for(const distance of [21.9,22.1,21.8,22.2,25,22.1,21.9,19,60,51.9,52.1,49,115,108,112,105,0]){
+        visuals.update(actor,.1,11,{x:2+distance,z:3},QUALITY_PROFILES.high);
+        assert.equal(root.proxyHead.render.meshInstances[0].material,face);assert.equal(root.proxyBody.render.meshInstances[0].material,damaged);
+        assert.equal(root.proxyBody.render.meshInstances[0].mesh,zombieMesh);
+        if(root.detail&&root.visualLOD===0){assert.equal(root.joints.head.render.meshInstances[0].material,face);assert.equal(root.joints.torso.render.meshInstances[0].material,damaged);}
+        assert.equal(root.proxyBody.enabled,root.visualLOD===1||root.visualLOD===2);if(root.detail)assert.equal(root.detail.enabled,root.visualLOD===0);
+    }
     visuals.update(actor,.1,11,{x:32,z:3},QUALITY_PROFILES.high);assert.equal(root.visualLOD,1);assert(root.proxyHead.getLocalPosition().z<0);assert.equal(root.proxyBody.render.meshInstances[0].mesh,zombieMesh);
     actor.type='civilian';visuals.update(actor,.1,11,{x:2,z:3},QUALITY_PROFILES.high);
     assert.equal(root.joints.torso.render.material,identity.body);assert.equal(root.joints.neck.render.material,skin);assert.equal(root.joints.armL.end.render.material,skin);

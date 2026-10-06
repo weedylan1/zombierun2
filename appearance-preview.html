@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><title>Zombie appearance comparison</title>
 <style>body{margin:0;background:#20262c;color:white;font:18px system-ui}canvas{width:100vw;height:100vh;display:block}header{position:absolute;top:20px;left:0;width:100%;text-align:center}footer{position:absolute;bottom:22px;width:100%;display:flex;justify-content:space-around}small{display:block;color:#c5d0d5}</style>
-<canvas id="view"></canvas><header>Same clothing, clearly different infection state<small>Human / zombie pairs • civilian and police • actual game meshes and materials</small></header>
+<canvas id="view"></canvas><header>Same clothing, clearly different infection state<small>Human / zombie pairs • civilian and police • actual game meshes and materials</small><label>Model detail <select id="detail"><option value="near">Near</option><option value="middle">Middle</option><option value="far">Far</option></select></label></header>
 <footer><span>Civilian → Zombie</span><span>Police → Infected police</span></footer>
 <script type="module">
 import * as pc from 'playcanvas';
@@ -17,5 +17,5 @@ const entity=factory.create(role,'adult','m',material(.8,.6,.4));app.root.addChi
 actors.push({id:i,entity,type:i%2?'zombie':role,walkDistance:0,state:'wander',lastScream:-99,lastVisualAttack:-99,weapon:null});}
 const camera=new pc.Entity('Camera');camera.addComponent('camera',{clearColor:new pc.Color(.12,.15,.18),fov:40});app.root.addChild(camera);camera.setPosition(0,2.1,8.5);camera.lookAt(0,.95,0);
 const light=new pc.Entity('Light');light.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.86),intensity:1.4});light.setEulerAngles(35,25,0);app.root.addChild(light);
-let now=0;app.on('update',dt=>{now+=dt;for(const actor of actors)factory.update(actor,dt,now,camera.getPosition(),QUALITY_PROFILES.high);});app.start();
+let now=0;app.on('update',dt=>{now+=dt;const choice=document.querySelector('#detail').value,profile={...QUALITY_PROFILES.high,near:choice==='near'?22:3,middle:choice==='far'?3:52};for(const actor of actors)factory.update(actor,dt,now,camera.getPosition(),profile);});app.start();
 </script></html>
