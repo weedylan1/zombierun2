@@ -23,7 +23,8 @@ const device=new engine.NullGraphicsDevice();device._isBrowserInterface=()=>true
 globalThis.document={createElement(){return {width:128,height:128,getContext(){return {fillRect(){},createImageData(w,h){return {data:new Uint8ClampedArray(w*h*4)};},putImageData(){}};}};}};
 class Entity extends engine.GraphNode {
     addComponent(type,data){if(type!=='render')return;this.render={...data,castShadows:false};let material=null;
-        Object.defineProperty(this.render,'material',{get:()=>material,set:v=>{material=v;for(const mi of this.render.meshInstances||[])mi.material=v;}});
+        // Custom RenderComponent.material does not bind MeshInstance materials.
+        Object.defineProperty(this.render,'material',{get:()=>material,set:v=>{material=v;}});
     }
     destroy(){for(const c of [...this.children])c.destroy();this.remove();for(const mi of this.render?.meshInstances||[])mi.destroy();}
 }
@@ -36,12 +37,24 @@ for(const age of ['adult','child'])for(const type of ['civilian','zombie','polic
     visuals.update(actor,.1,10,{x:2,z:3},QUALITY_PROFILES.high);assert(root.detail);assert.equal(root.visualLOD,0);assert.equal(Object.keys(root.limbs).length,4);assert.equal(actor.walkDistance,0);
     let triangles=0;root.detail.forEach(e=>{for(const mi of e.render?.meshInstances||[])triangles+=mi.mesh.primitive[0].count/3;});assert(triangles<5000);
     actor.type='zombie';actor.walkDistance=.1;visuals.update(actor,.1,11,{x:2,z:3},QUALITY_PROFILES.high);assert.equal(root.appearance,identity);assert.equal(root.proxyHead.render.material,mats.zombie);assert.equal(root.getPosition().equals(position),true);
+    assert.equal(root.joints.neck.render.material,mats.zombie);assert.equal(root.joints.armL.end.render.material,mats.zombie);
+    assert.equal(root.joints.head.render.meshInstances[0].material,root.joints.head.render.material);
+    assert.equal(root.joints.neck.render.meshInstances[0].material,mats.zombie);assert.equal(root.proxyHead.render.meshInstances[0].material,mats.zombie);
+    assert.equal(root.joints.torso.render.meshInstances[0].material,root.joints.torso.render.material);
+    assert.notEqual(root.joints.torso.render.material,identity.body);assert(root.joints.torso.render.material.diffuse.equals(identity.body.diffuse));
+    assert(root.joints.armL.end.getPosition().z<root.joints.armL.joint.getPosition().z,'Zombie hands must reach forward');
+    const zombieMesh=root.proxyBody.render.meshInstances[0].mesh;
+    visuals.update(actor,.1,11,{x:32,z:3},QUALITY_PROFILES.high);assert.equal(root.visualLOD,1);assert(root.proxyHead.getLocalPosition().z<0);assert.equal(root.proxyBody.render.meshInstances[0].mesh,zombieMesh);
+    actor.type='civilian';visuals.update(actor,.1,11,{x:2,z:3},QUALITY_PROFILES.high);
+    assert.equal(root.joints.torso.render.material,identity.body);assert.equal(root.joints.neck.render.material,skin);assert.equal(root.joints.armL.end.render.material,skin);
+    assert.equal(root.proxyHead.getLocalPosition().z,0);assert.notEqual(root.proxyBody.render.meshInstances[0].mesh,zombieMesh);
+    actor.type='zombie';
     actor.walkDistance=.1;visuals.update(actor,.1,12,{x:1000,z:1000},QUALITY_PROFILES.quest);assert.equal(root.detail,null);assert.equal(root.proxyBody.enabled,false);assert.equal(actor.walkDistance,0);
     actor.walkDistance=.1;visuals.update(actor,.1,13,{x:2,z:3},QUALITY_PROFILES.quest);assert(root.detail);root.detail.forEach(e=>{for(const mi of e.render?.meshInstances||[])assert(mi.mesh.vertexBuffer,'Shared mesh freed during LOD destruction');});
     assert.equal(root.appearance,identity);assert.equal(root.getPosition().equals(position),true);root.destroy();
 }
 const idle=locomotionPose({id:1,type:'civilian',walkDistance:0,lastScream:-99},.1,10),flee=locomotionPose({id:1,type:'civilian',state:'flee',walkDistance:.5,lastScream:-99},.1,10),zombie=locomotionPose({id:1,type:'zombie',walkDistance:.2,lastScream:-99,lastVisualAttack:10},.1,10);
-assert(Math.abs(flee.legL)>Math.abs(idle.legL));assert.equal(flee.lean,9);assert(zombie.armL<0);assert(zombie.legL!==-zombie.legR);assert.equal(zombie.attack,1);
+assert(Math.abs(flee.legL)>Math.abs(idle.legL));assert.equal(flee.lean,9);assert(zombie.armL>50);assert.equal(zombie.lean,-24);assert(zombie.legL!==-zombie.legR);assert.equal(zombie.attack,1);
 
 app.townProfile=QUALITY_PROFILES.high;const pbr=createPBRLibrary(pc,app),brick=pbr.material('brick'),normal=brick.normalMap;
 assert.equal(brick.glossMapChannel,'g');assert.equal(brick.glossInvert,true);assert.equal(brick.aoMapChannel,'r');assert.equal(brick.metalnessMapChannel,'b');assert.equal(brick.diffuseMap.width,512);

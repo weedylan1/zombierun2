@@ -621,10 +621,10 @@ function setZombie(a){
     a.weapon=null;a.ammo=0; a.type='zombie'; a.state='wander'; a.target=null; a.infected=false; a.biteCount=0; a.eaten=false;
     a.speed=randomAgentSpeed('zombie',a.age);a.hp=2;a.wanderTarget=randomStreetPoint();a.routeTarget=null;a.routeUntil=0;
     a.stuckFor=0;a.nextThink=now;a.nextAttack=0;a.lastActivityAt=now;a.heard=null;a.heardUntil=0;a.feedingUntil=0;
-    a.fallen=false; a.fallAngle=0; a.entity.setLocalEulerAngles(8,a.entity.getEulerAngles().y,0);
+    a.fallen=false; a.fallAngle=0; a.entity.setLocalEulerAngles(0,a.entity.getEulerAngles().y,0);
     // swap visible materials on head and body posture
     const head=a.entity.findByName('Head'); if(head?.render) head.render.material=mats.zombie;
-    a.entity.setLocalEulerAngles(8,a.entity.getEulerAngles().y,0);
+    a.entity.setLocalEulerAngles(0,a.entity.getEulerAngles().y,0);
 }
 
 function biteHuman(victim,zombie,now){
