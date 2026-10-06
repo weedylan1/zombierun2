@@ -6,8 +6,8 @@ export function locomotionPose(a,dt,now){
     const phase=a.walkCycle+(a.id||0)*.73,s=Math.sin(phase),c=Math.cos(phase),stride=moving?(zombie?19:panic?40:25):1;
     const action=Math.max(0,1-(now-(a.lastVisualAttack??-99))/.55);
     return {phase,speed,legL:s*stride,legR:-s*stride*(zombie?.55:1),kneeL:Math.max(0,-s)*stride*1.1,kneeR:Math.max(0,s)*stride,
-        armL:zombie?72+c*10:-s*stride*.65-(panic?18:0),armR:zombie?57+s*14:s*stride*.65-(panic?18:0),
-        lean:zombie?-24:panic?9:0,bob:moving?Math.abs(c)*(zombie?.025:.035):Math.sin(now*1.7+(a.id||0))*.006,
+        armL:zombie?72+c*10:-s*stride*.65+(panic?18:0),armR:zombie?57+s*14:s*stride*.65+(panic?18:0),
+        lean:zombie?-24:panic?-9:0,bob:moving?Math.abs(c)*(zombie?.025:.035):Math.sin(now*1.7+(a.id||0))*.006,
         headYaw:a.state==='investigate'?Math.sin(now*2)*22:Math.sin(phase*.25)*6,
         scream:!zombie&&now-a.lastScream<.8,attack:action,combat:a.state==='combat',axe:a.type==='firefighter'&&action>0};
 }
@@ -33,14 +33,15 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
     function faceMaterial(base){
         if(faces.has(base.id))return faces.get(base.id);const m=base.clone(),canvas=document.createElement('canvas');canvas.width=canvas.height=128;const g=canvas.getContext('2d');
         g.fillStyle='#ffffff';g.fillRect(0,0,128,128);g.fillStyle='#3b3028';
-        // Sphere UV repeats the face at the front seam; features remain restrained.
-        for(const x of [4,60,68,124])g.fillRect(x,48,4,3);g.fillStyle='#895b52';for(const x of [0,64,128])g.fillRect(x-5,72,10,3);
+        // PlayCanvas sphere front (-Z) is the U=0/1 seam. U=.5 is
+        // the back of the head: never draw a second face there.
+        for(const x of [4,124])g.fillRect(x,48,4,3);g.fillStyle='#895b52';for(const x of [0,128])g.fillRect(x-5,72,10,3);
         if(base===mats.zombie){
             // Repeat around the sphere: sockets, pale eyes, open jaw and wounds.
-            g.fillStyle='#193020';for(const x of [4,60,68,124])g.fillRect(x-3,43,10,12);
-            g.fillStyle='#e8ecc2';for(const x of [4,60,68,124])g.fillRect(x,47,4,4);
-            g.fillStyle='#201815';for(const x of [0,64,128])g.fillRect(x-8,68,16,16);
-            g.fillStyle='#c7c0a1';for(const x of [0,64,128])g.fillRect(x-6,69,12,3);
+            g.fillStyle='#193020';for(const x of [4,124])g.fillRect(x-3,43,10,12);
+            g.fillStyle='#e8ecc2';for(const x of [4,124])g.fillRect(x,47,4,4);
+            g.fillStyle='#201815';for(const x of [0,128])g.fillRect(x-8,68,16,16);
+            g.fillStyle='#c7c0a1';for(const x of [0,128])g.fillRect(x-6,69,12,3);
             g.fillStyle='#6e211a';for(const x of [12,52,76,116])g.fillRect(x,57,7,19);
         }
         const t=new pc.Texture(app.graphicsDevice,{width:128,height:128,mipmaps:true});t.setSource(canvas);m.diffuseMap=t;m.update();faces.set(base.id,m);return m;
@@ -48,6 +49,10 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
     function damagedMaterial(base){
         if(damagedClothes.has(base.id))return damagedClothes.get(base.id);
         const m=base.clone(),canvas=document.createElement('canvas');canvas.width=canvas.height=128;const g=canvas.getContext('2d');
+        // A consistent sickly green cast across the outfit remains readable
+        // from behind and in shade; original uniform colours still contribute.
+        m.diffuse=new pc.Color(base.diffuse.r*.45+.26*.55,base.diffuse.g*.45+.72*.55,base.diffuse.b*.45+.24*.55);
+        m.emissive=new pc.Color(.018,.045,.012);
         g.fillStyle='#b7b5a5';g.fillRect(0,0,128,128);
         // Broad stains and torn strips survive minification; retain the outfit colour.
         g.fillStyle='#54221d';for(const x of [8,48,88])g.fillRect(x,26,22,59);
@@ -84,12 +89,12 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         const look=root.appearance,h=look.height,scale=h/1.72,body=look.body,skin=look.skin;
         const model=new pc.Entity('Detailed humanoid');root.addChild(model);model.setLocalScale(scale,scale,scale);root.detail=model;
         const torso=render(model,'Tailored torso',capsule,body,0,1.0,0,look.gender==='f'?.43:.48,.38,.29);
-        render(model,'Hips',capsule,look.trousers,0,.67,0,.34,.17,.27);
+        const hips=render(model,'Hips',capsule,look.trousers,0,.67,0,.34,.17,.27);
         const neck=render(model,'Neck',capsule,skin,0,1.36,0,.13,.09,.13);
         const head=render(model,'Detailed head',headMesh,faceMaterial(skin),0,1.54,0,.23,.30,.24);
         const hairCap=render(model,'Hair silhouette',headMesh,look.hair,0,1.66,.018,.25,.13,.25);
         if(look.gender==='f')render(model,'Longer hair silhouette',capsule,look.hair,0,1.52,.11,.22,.14,.095);
-        const joints={torso,head,hairCap,neck};
+        const joints={torso,head,hairCap,neck,hips};
         function limb(name,x,y,upperLen,lowerLen,width,mat,hand){
             const joint=new pc.Entity(name+' joint');model.addChild(joint);joint.setLocalPosition(x,y,0);
             const upperMesh=render(joint,name,capsule,mat,0,-upperLen/2,0,width,upperLen/2,width);
@@ -130,6 +135,7 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         if(lod!==0||!root.joints)return;
         const j=root.joints;setMaterial(j.head,faceMaterial(skin));setMaterial(j.neck,skin);
         setMaterial(j.torso,zombie?damagedMaterial(root.appearance.body):root.appearance.body);
+        setMaterial(j.hips,zombie?damagedMaterial(root.appearance.trousers):root.appearance.trousers);
         for(const limb of [j.armL,j.armR,j.legL,j.legR]){
             const material=zombie?damagedMaterial(limb.baseMaterial):limb.baseMaterial;
             setMaterial(limb.upperMesh,material);setMaterial(limb.lowerMesh,material);
@@ -139,11 +145,11 @@ export function createCharacterVisuals(pc,app,mats,clothesMaterials,choose){
         if(a.fallen){a.fallAngle=Math.min(84,(a.fallAngle||0)+dt*300);const yaw=root.getEulerAngles().y;root.setLocalEulerAngles(0,yaw,a.fallAngle*a.fallDirection);return;}
         root.detail.setLocalPosition(0,pose.bob,0);root.detail.setLocalEulerAngles(pose.lean,0,0);
         j.legL.joint.setLocalEulerAngles(pose.legL,0,0);j.legR.joint.setLocalEulerAngles(pose.legR,0,0);j.legL.lower.setLocalEulerAngles(-pose.kneeL,0,0);j.legR.lower.setLocalEulerAngles(-pose.kneeR,0,0);
-        j.armL.joint.setLocalEulerAngles(pose.scream?-110:pose.armL,0,zombie?-9:0);j.armR.joint.setLocalEulerAngles(pose.scream?-105:pose.armR,0,zombie?12:0);
+        j.armL.joint.setLocalEulerAngles(pose.scream?110:pose.armL,0,zombie?-9:0);j.armR.joint.setLocalEulerAngles(pose.scream?105:pose.armR,0,zombie?12:0);
         j.armL.lower.setLocalEulerAngles(-25,0,0);j.armR.lower.setLocalEulerAngles(-25,0,0);
         j.head.setLocalEulerAngles(zombie?Math.sin(pose.phase*1.7)*5:0,pose.headYaw,0);j.hairCap.setLocalEulerAngles(0,pose.headYaw,0);
-        if(pose.combat){j.armR.joint.setLocalEulerAngles(-80-pose.attack*10,0,0);j.armR.lower.setLocalEulerAngles(-12,0,0);j.armL.joint.setLocalEulerAngles(-60,0,-20);}
-        if(pose.axe)j.armR.joint.setLocalEulerAngles(-145+pose.attack*170,0,0);
+        if(pose.combat){j.armR.joint.setLocalEulerAngles(80+pose.attack*10,0,0);j.armR.lower.setLocalEulerAngles(-12,0,0);j.armL.joint.setLocalEulerAngles(60,0,-20);}
+        if(pose.axe)j.armR.joint.setLocalEulerAngles(145-pose.attack*170,0,0);
         if(zombie&&pose.attack){j.armL.joint.setLocalEulerAngles(90,0,-10);j.armR.joint.setLocalEulerAngles(100,0,15);j.head.setLocalEulerAngles(-15,0,0);}
         if(j.tool)j.tool.enabled=Boolean(a.weapon);
         if(j.flash)j.flash.enabled=Boolean(a.weapon)&&now-(a.lastVisualAttack??-99)<.06;

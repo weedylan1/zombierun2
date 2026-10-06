@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import * as engine from 'playcanvas';
 import {surfaceData,createPBRLibrary} from './src/procedural-surfaces.js';
 import {QUALITY_PROFILES,resolveQuality,characterLOD,stableCharacterLOD,seededRandom} from './src/quality-profiles.js';
@@ -49,7 +51,7 @@ for(const age of ['adult','child'])for(const type of ['civilian','zombie','polic
     assert.equal(root.joints.head.render.meshInstances[0].material,root.joints.head.render.material);
     assert.equal(root.joints.neck.render.meshInstances[0].material,mats.zombie);assert.equal(root.proxyHead.render.meshInstances[0].material,root.joints.head.render.meshInstances[0].material);
     assert.equal(root.joints.torso.render.meshInstances[0].material,root.joints.torso.render.material);
-    assert.notEqual(root.joints.torso.render.material,identity.body);assert(root.joints.torso.render.material.diffuse.equals(identity.body.diffuse));
+    assert.notEqual(root.joints.torso.render.material,identity.body);assert(root.joints.torso.render.material.diffuse.g>identity.body.diffuse.g);
     assert(root.joints.armL.end.getPosition().z<root.joints.armL.joint.getPosition().z,'Zombie hands must reach forward');
     const zombieMesh=root.proxyBody.render.meshInstances[0].mesh;
     const face=root.joints.head.render.meshInstances[0].material,damaged=root.joints.torso.render.meshInstances[0].material,uvs=[];zombieMesh.getUvs(0,uvs);assert.equal(uvs.length,zombieMesh.vertexBuffer.numVertices*2);assert(new Set(uvs).size>1);
@@ -70,7 +72,17 @@ for(const age of ['adult','child'])for(const type of ['civilian','zombie','polic
     assert.equal(root.appearance,identity);assert.equal(root.getPosition().equals(position),true);root.destroy();
 }
 const idle=locomotionPose({id:1,type:'civilian',walkDistance:0,lastScream:-99},.1,10),flee=locomotionPose({id:1,type:'civilian',state:'flee',walkDistance:.5,lastScream:-99},.1,10),zombie=locomotionPose({id:1,type:'zombie',walkDistance:.2,lastScream:-99,lastVisualAttack:10},.1,10);
-assert(Math.abs(flee.legL)>Math.abs(idle.legL));assert.equal(flee.lean,9);assert(zombie.armL>50);assert.equal(zombie.lean,-24);assert(zombie.legL!==-zombie.legR);assert.equal(zombie.attack,1);
+assert(Math.abs(flee.legL)>Math.abs(idle.legL));assert.equal(flee.lean,-9);assert(zombie.armL>50);assert.equal(zombie.lean,-24);assert(zombie.legL!==-zombie.legR);assert.equal(zombie.attack,1);
+
+// Execute the actual game steering with real engine lookAt/transforms, rather
+// than a no-op lookAt mock, and compare facing with actual displacement.
+const movementContext={Math,performance,MIN_AGENT_SPACING:1.4,dist2:(a,b)=>(a.x-b.x)**2+(a.z-b.z)**2,nearby:()=>[],obstacleAreaClear:()=>true,movementBlocked:()=>false,updateCrowdCell(){},randomStreetPoint:()=>new engine.Vec3(20,0,20)};
+vm.createContext(movementContext);const mainSource=fs.readFileSync('src/main.js','utf8');vm.runInContext(mainSource.slice(mainSource.indexOf('function steerMove('),mainSource.indexOf('function animatePerson(')),movementContext);
+for(const type of ['civilian','zombie','police','firefighter'])for(const [x,z] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1]]){
+    const entity=new Entity('moving actor');app.root.addChild(entity);const a={id:12,type,entity,speed:2,facing:new engine.Vec3(0,0,-1)};
+    for(let frame=0;frame<30;frame++){const before=entity.getPosition().clone();movementContext.steerMove(a,new engine.Vec3(x*20,0,z*20),1/60);const displacement=entity.getPosition().clone().sub(before).normalize();assert(entity.forward.dot(displacement)>.999,'Actual steering must face the movement direction');}
+    entity.destroy();
+}
 
 app.townProfile=QUALITY_PROFILES.high;const pbr=createPBRLibrary(pc,app),brick=pbr.material('brick'),normal=brick.normalMap;
 assert.equal(brick.glossMapChannel,'g');assert.equal(brick.glossInvert,true);assert.equal(brick.aoMapChannel,'r');assert.equal(brick.metalnessMapChannel,'b');assert.equal(brick.diffuseMap.width,512);
