@@ -4,3 +4,4 @@ out/
 *.log
 *.zip
 *.tmp
+out-*/

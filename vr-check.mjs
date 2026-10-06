@@ -33,11 +33,13 @@ assert(fallback.read([leftGrip]).sprint);assert.equal(fallback.read([leftGrip]).
 leftGrip.gamepad.buttons[0].pressed=false;assert.equal(fallback.read([leftGrip]).sprint,false);
 leftGrip.gamepad.buttons[1].pressed=true;leftGrip.gamepad.buttons[3].pressed=true;
 assert.equal(fallback.read([leftGrip]).sprint,false,'Grip and stick click must not sprint');
-const handlers={},lifecycle={enteringVR:false,started:true,gameOver:true,won:false,app:{xr:{on(name,fn){handlers[name]=fn;}}},vrControls:createVRControls(),document:{exitPointerLock(){}},refreshVRButton(){},resetGame(){this.started=true;this.gameOver=false;},leaveGame(){this.started=false;this.gameOver=false;}};
+let qualityChanges=0;
+const handlers={},lifecycle={applyQuality(){qualityChanges++;},enteringVR:false,started:true,gameOver:true,won:false,app:{xr:{on(name,fn){handlers[name]=fn;}}},vrControls:createVRControls(),document:{exitPointerLock(){}},refreshVRButton(){},resetGame(){this.started=true;this.gameOver=false;},leaveGame(){this.started=false;this.gameOver=false;}};
 // Bind callbacks to update the same simulated session state as the real handlers.
 lifecycle.resetGame=()=>{lifecycle.started=true;lifecycle.gameOver=false;};lifecycle.leaveGame=()=>{lifecycle.started=false;lifecycle.gameOver=false;};
 vm.createContext(lifecycle);vm.runInContext(source.slice(source.indexOf("app.xr.on('start'"),source.indexOf('function toggleVR(')),lifecycle);
 handlers.start();assert.equal(lifecycle.gameOver,false);handlers.end();assert.equal(lifecycle.started,false);handlers.start();assert.equal(lifecycle.started,true);
+assert.equal(qualityChanges,3,'XR start/end must reapply the quality profile');
 console.log('PASS: hold left trigger sprint, release to walk, grip/stick do not sprint, alternative stick axes, exit-to-menu, and VR re-entry');
 const rendered=[];
 globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},fillText(text){rendered.push(text);}})})};

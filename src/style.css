@@ -56,3 +56,9 @@ button { cursor:pointer; }
 #startButton,#restartButton { background:#516c36;border-color:#b1c784; }
 #gameMode { background:#1b292c;border-color:#748678; }
 #brand span { color:#c1d99c; }
+
+.start-settings { display:grid;grid-template-columns:100px 1fr;align-items:center;gap:8px;text-align:left;margin:16px 0; }
+.start-settings select { min-width:0;width:100%;padding:9px;background:#1b292c;color:#edf1e5;border:1px solid #748678;border-radius:6px; }
+#startCard { max-height:calc(100dvh - 72px);overflow:auto;box-sizing:border-box; }
+#benchmarkPanel { position:fixed;left:18px;top:78px;max-width:240px;padding:8px 12px;background:#111c;color:#d8dfc8;font-size:11px;line-height:1.5;white-space:pre-line;pointer-events:none; }
+#benchmarkPanel[hidden] { display:none; }

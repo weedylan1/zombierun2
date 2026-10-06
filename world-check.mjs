@@ -5,7 +5,7 @@ import {walkwayHeight,walkStepBlocked} from './src/walkways.js';
 const source=fs.readFileSync('src/main.js','utf8'),created=[];
 let seed=Number(process.argv[2]||151);const math=Object.create(Math);math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
 const v3=(x=0,y=0,z=0)=>({x,y,z});
-const context={Math:math,v3,rand:(a,b)=>a+math.random()*(b-a),choose:a=>a[Math.floor(math.random()*a.length)],dist2:(a,b)=>(a.x-b.x)**2+(a.z-b.z)**2,buildingMaterials:[{},{},{},{},{}],mats:{},box(name,pos,size){created.push({name,pos,size});return {setEulerAngles(){}};},createCityDetails:()=>({facade:m=>m,carPaint:m=>m,decorate(){},backdrop(){},sign:t=>t})};
+const context={Math:math,worldRandom:math.random,v3,rand:(a,b)=>a+math.random()*(b-a),choose:a=>a[Math.floor(math.random()*a.length)],dist2:(a,b)=>(a.x-b.x)**2+(a.z-b.z)**2,buildingMaterials:[{},{},{},{},{}],mats:{},box(name,pos,size){created.push({name,pos,size});return {setEulerAngles(){}};},createCityDetails:()=>({facade:m=>m,carPaint:m=>m,decorate(){},backdrop(){},sign:t=>t})};
 vm.createContext(context);
 context.pc={Entity:class {constructor(name){this.name=name;}addComponent(){this.render={};}setPosition(){}setLocalScale(){}setEulerAngles(){}}};context.app={root:{addChild(){}}};context.staticCityEntities=[];context.clothesMaterials=[{}];
 vm.runInContext(source.slice(source.indexOf('const WORLD_SCALE='),source.indexOf('function randomStreetPoint(')),context);

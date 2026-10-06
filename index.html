@@ -20,6 +20,7 @@
     <div id="message"></div>
   </div>
   <div id="crosshair">+</div>
+  <div id="benchmarkPanel" hidden aria-live="off"></div>
   <div id="help">
     <b>WASD</b> move · <b>Hold right mouse / Shift</b> sprint (uses energy) · <b>Mouse</b> look · <b>E</b> pick up weapon / ammo · <b>Click</b> use weapon · <b>V</b> VR · <b>Esc / Q</b> menu
   </div>
@@ -36,6 +37,8 @@
     <label for="gameMode">Game mode</label>
     <select id="gameMode"><option value="standard">Standard — 20 zombies, shotgun</option><option value="carnage">Carnage — 100 zombies, 100-round machine gun</option></select>
     <p>Machine gun: hold left mouse, touch FIRE, or right VR trigger to fire.</p>
+    <div class="start-settings"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="high">PC High</option><option value="low">PC Low</option><option value="quest">Quest / Mobile</option></select>
+    <label for="startArea">Starting area</label><select id="startArea"><option value="normal">Sporting goods street</option><option value="street">High street benchmark · 100 local actors</option></select></div>
     <button id="startButton">PLAY ON PC</button>
     <small>PC: WASD + mouse; hold right mouse to run; Esc or Q returns to the menu. Touch: drag the left stick to move, drag the screen to look, hold RUN to sprint, tap PICK UP or FIRE, and use MENU to leave. VR: use ENTER VR with a compatible headset over HTTPS or localhost. Left stick moves; hold left trigger to sprint. Right grip picks up, right trigger uses a weapon, B or Y restarts, and A exits to the menu.</small>
   </div>

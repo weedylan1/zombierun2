@@ -1,8 +1,11 @@
 import * as pc from 'playcanvas';
 import { applySurface, scaledSurface } from './procedural-surfaces.js';
+import {createCharacterVisuals} from './character-visuals.js';
+import {resolveQuality,seededRandom} from './quality-profiles.js';
+import {arrangeStreetBenchmark} from './street-benchmark.js';
 import { createEnergy } from './energy.js';
 import { createVRControls } from './vr-controls.js';
-import { createTouchControls } from './touch-controls.js';
+import { createTouchControls,isMobileTouchDevice } from './touch-controls.js';
 import { createZombieAudio } from './zombie-audio.js';
 import { createAmbience } from './ambience.js';
 import { createVRHud } from './vr-hud.js';
@@ -22,12 +25,15 @@ const app = new pc.Application(canvas, {
 });
 app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(pc.RESOLUTION_AUTO);
-app.scene.ambientLight = new pc.Color(0.48, 0.50, 0.54);
-app.scene.exposure = 1.15;
+app.scene.ambientLight = new pc.Color(0.28, 0.32, 0.38);
+app.scene.exposure = .95;
+app.scene.fog.type=pc.FOG_LINEAR;
+app.scene.fog.color=new pc.Color(.48,.54,.57);
+app.scene.fog.start=65;app.scene.fog.end=260;
 app.start();
 
 const COLORS = {
-    sky: new pc.Color(0.56, 0.64, 0.68),
+    sky: new pc.Color(0.48, 0.54, 0.57),
     road: new pc.Color(0.12, 0.13, 0.13),
     pavement: new pc.Color(0.38, 0.39, 0.37),
     grass: new pc.Color(0.18, 0.28, 0.16),
@@ -61,6 +67,8 @@ const mats = {
     gun: material(new pc.Color(0.06,0.06,0.065)), axe: material(new pc.Color(0.42,0.29,0.15))
 };
 
+let currentQuality=resolveQuality('auto',false,isMobileTouchDevice(window.navigator));
+app.townProfile=currentQuality;
 for(const kind of ['road','pavement','grass'])applySurface(pc,app,mats[kind],kind);
 const surfaceCache=new Map();
 const surfaceMaterials=new Set([mats.road,mats.pavement,mats.grass]);
@@ -73,9 +81,9 @@ const skinMaterials = [
     material(new pc.Color(0.86, 0.61, 0.43))
 ];
 const clothesMaterials = [
-    material(new pc.Color(0.12,0.28,0.46)), material(new pc.Color(0.48,0.12,0.1)),
-    material(new pc.Color(0.18,0.42,0.22)), material(new pc.Color(0.42,0.36,0.12)),
-    material(new pc.Color(0.35,0.18,0.42)), material(new pc.Color(0.18,0.18,0.2))
+    material(new pc.Color(0.18,0.26,0.34)), material(new pc.Color(0.34,0.19,0.15)),
+    material(new pc.Color(0.20,0.30,0.22)), material(new pc.Color(0.36,0.32,0.23)),
+    material(new pc.Color(0.25,0.21,0.28)), material(new pc.Color(0.18,0.18,0.2))
 ];
 const buildingMaterials = [
     material(new pc.Color(0.45,0.40,0.36)), material(new pc.Color(0.55,0.52,0.47)),
@@ -83,6 +91,8 @@ const buildingMaterials = [
     material(new pc.Color(0.33,0.37,0.31))
 ];
 
+const characterVisuals=createCharacterVisuals(pc,app,mats,clothesMaterials,choose);
+const worldRandom=seededRandom(53197);
 const staticCityEntities=[];
 let collectingStaticCity=true;
 function box(name, pos, scale, mat, parent = app.root) {
@@ -106,13 +116,13 @@ function sphere(name, pos, scale, mat, parent = app.root) {
 }
 function v3(x=0,y=0,z=0){ return new pc.Vec3(x,y,z); }
 function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
-function rand(a,b){ return a + Math.random()*(b-a); }
-function choose(a){ return a[(Math.random()*a.length)|0]; }
+function rand(a,b){ return a + (collectingStaticCity?worldRandom():Math.random())*(b-a); }
+function choose(a){ return a[((collectingStaticCity?worldRandom():Math.random())*a.length)|0]; }
 function dist2(a,b){ const dx=a.x-b.x,dz=a.z-b.z; return dx*dx+dz*dz; }
 
 // Lighting
 const sun = new pc.Entity('Sun');
-sun.addComponent('light', { type: 'directional', color: new pc.Color(1,0.95,0.85), intensity: 1.25, castShadows: false });
+sun.addComponent('light', { type: 'directional', color: new pc.Color(1,0.95,0.85), intensity: 1.55, castShadows: false });
 sun.setEulerAngles(50,-35,0);
 app.root.addChild(sun);
 
@@ -135,33 +145,25 @@ function addRoadObstacle(x,z,width,depth,occludes=true,maxy=2){
     obstacleCandidates.index=null;
 }
 const roadLines = [];
-const cityDetails=createCityDetails(pc,app,box,v3);
+const cityDetails=createCityDetails(pc,app,box,v3,addRoadObstacle);
 
 box('Ground', v3(0,-0.12,0), v3(CITY_HALF*2+30,0.2,CITY_HALF*2+30), mats.grass);
 
 for (const x of ROAD_POSITIONS) {
     box('RoadX', v3(x,0,0), v3(ROAD_WIDTH,0.05,CITY_HALF*2+20), mats.road);
     roadLines.push({axis:'z', value:x});
-    box('LineX', v3(x,0.035,0), v3(0.13,0.02,CITY_HALF*2+20), mats.yellow);
+
 }
 for (const z of ROAD_POSITIONS) {
     box('RoadZ', v3(0,0,z), v3(CITY_HALF*2+20,0.05,ROAD_WIDTH), mats.road);
     roadLines.push({axis:'x', value:z});
-    box('LineZ', v3(0,0.035,z), v3(CITY_HALF*2+20,0.02,0.13), mats.yellow);
+
 }
 
 function addBuilding(cx, cz, w, d, h, mat) {
-    const e = box('Building', v3(cx,h/2,cz), v3(w,h,d), cityDetails.facade(mat,h));
+    const e=box('Building',v3(cx,(h+4)/2,cz),v3(w,h-4,d),cityDetails.facade(mat,h));
     cityDetails.decorate(cx,cz,w,d,h,mats.pavement);
     buildingBoxes.push({minx:cx-w/2-0.5,maxx:cx+w/2+0.5,minz:cz-d/2-0.5,maxz:cz+d/2+0.5,maxy:h});
-    // Ground-floor shopfront details
-    const frontZ = cz + d/2 + 0.02;
-    const windowCount = Math.max(2, Math.floor(w/5));
-    for (let i=0;i<windowCount;i++) {
-        const wx = cx - w/2 + (i+0.5)*w/windowCount;
-        box('ShopWindow', v3(wx,1.5,frontZ), v3(Math.max(1.5,w/windowCount-0.45),2.1,0.08), mats.glass);
-    }
-    if (Math.random() < 0.65) box('Awning', v3(cx,2.9,frontZ+0.45), v3(w*0.72,0.12,0.9), choose([mats.red,mats.yellow,mats.police]));
     return e;
 }
 
@@ -199,31 +201,31 @@ for (let ix=0;ix<6;ix++) {
         const zi=(iz-2.5)*ROAD_STEP;
         // leave north-east corner as mall approach / car park
         if (xi > 50 && zi < -50) continue;
-        const h = rand(10,31);
+        const h = rand(9,15);
         const w = BLOCK-rand(3,6), d = BLOCK-rand(3,6);
         const alley=[['1,1',true,true],['2,4',true,false],['4,3',true,true],['3,1',true,false],['4,4',true,true],['1,3',false,false]].find(a=>a[0]===ix+','+iz);
         if(ix===3&&iz===3){
             addBuilding(xi,zi,w,d,8,buildingMaterials[3]);
-            box('Archery store sign',v3(xi,3.8,zi+d/2+.2),v3(w*.85,1.4,.18),cityDetails.sign('ARCHERY & CROSSBOWS'));
+            box('Archery store sign',v3(xi,3.8,zi+d/2+.2),v3(5.4,.55,.18),cityDetails.sign('ARCHERY & CROSSBOWS'));
             archeryPickupPosition=v3(xi,.55,zi+d/2+1.8);
             box('Crossbow display stand',v3(xi,.2,zi+d/2+1.8),v3(1.4,.4,.8),mats.axe);
             addRoadObstacle(xi,zi+d/2+1.8,1.4,.8,true,.4);
         }else if(ix===0&&iz===5){
             addBuilding(xi,zi,w,d,9,buildingMaterials[1]);
             const front=xi-w/2;
-            box('Sporting goods store sign',v3(front-.2,3.8,zi),v3(.18,1.4,d*.85),cityDetails.sign('SPORTING GOODS'));
+            box('Sporting goods store sign',v3(front-.2,3.8,zi),v3(.18,.55,5.4),cityDetails.sign('SPORTING GOODS'));
             sportingPickupPosition=v3(front-1.8,.55,zi);
             box('Shotgun display stand',v3(front-1.8,.2,zi),v3(.8,.4,1.4),mats.axe);
             addRoadObstacle(front-1.8,zi,.8,1.4,true,.4);
         }else if(alley)addAlley(xi,zi,w,d,h,choose(buildingMaterials),alley[1],alley[2]);
         else addBuilding(xi+rand(-1.2,1.2),zi+rand(-1.2,1.2),w,d,h,choose(buildingMaterials));
         // bins / street props at corners
-        if (Math.random()<0.8){
+        if (worldRandom()<0.8){
             const bx=xi-BLOCK/2-2,bz=zi-BLOCK/2-2;
             box('Bin',v3(bx,0.55,bz),v3(0.7,1.1,0.7),mats.black);
             addRoadObstacle(bx,bz,0.7,0.7,true,1.1);
         }
-        if (Math.random()<0.7) {
+        if (worldRandom()<0.7) {
             const p = v3(xi+BLOCK/2+2,1.7,zi-BLOCK/2-2);
             box('LampPost',p,v3(0.12,3.4,0.12),mats.black);
             addRoadObstacle(p.x,p.z,0.12,0.12,false,3.4);
@@ -260,7 +262,7 @@ for(let side=0;side<4;side++){
     }
 }
 for (let i=0;i<38;i++) {
-    const horizontal = Math.random()<0.5;
+    const horizontal = worldRandom()<0.5;
     const line = choose(ROAD_POSITIONS);
     const along = rand(-100*WORLD_SCALE,100*WORLD_SCALE);
     const x = horizontal ? along : line + choose([-3.0,3.0]);
@@ -269,21 +271,10 @@ for (let i=0;i<38;i++) {
     if(dist2(v3(x,0,z),sportingPickupPosition)<36)continue;
     if(crossings.some(c=>Math.abs(x-c.x)<4&&Math.abs(z-c.z)<8))continue;
     const paint=choose(clothesMaterials);
-    const car = box('Car',v3(x,0.55,z), horizontal?v3(3.8,0.9,1.8):v3(1.8,0.9,3.8), cityDetails.carPaint(paint));
-    addRoadObstacle(x,z,horizontal?3.8:1.8,horizontal?1.8:3.8,true,1.45);
-    box('CarRoof',v3(x,1.15,z),horizontal?v3(2.0,0.55,1.55):v3(1.55,0.55,2.0),mats.glass);
-    box('Painted car roof',v3(x,1.43,z),horizontal?v3(1.65,.08,1.42):v3(1.42,.08,1.65),cityDetails.carPaint(paint));
-    for(const side of [-1,1]){
-        box('Car bumper',horizontal?v3(x+side*1.9,.35,z):v3(x,.35,z+side*1.9),horizontal?v3(.12,.15,1.75):v3(1.75,.15,.12),mats.gun);
-        const end=horizontal?v3(x+side*1.91,.65,z):v3(x,.65,z+side*1.91);
-        box(side===1?'Car headlights':'Car tail lights',end,horizontal?v3(.04,.18,1.3):v3(1.3,.18,.04),side===1?mats.white:mats.red);
-        for(const wheel of [-1,1]){
-            const position=horizontal?v3(x+wheel*1.2,.3,z+side*.91):v3(x+side*.91,.3,z+wheel*1.2);
-            const tyre=new pc.Entity('Car tyre');tyre.addComponent('render',{type:'cylinder'});tyre.render.material=mats.black;
-            app.root.addChild(tyre);tyre.setPosition(position);tyre.setLocalScale(.58,.18,.58);tyre.setEulerAngles(horizontal?90:0,0,horizontal?0:90);staticCityEntities.push(tyre);
-            box('Wheel hub',position,horizontal?v3(.28,.28,.19):v3(.19,.28,.28),mats.gun);
-        }
-    }
+    const kind=i%9===0?'van':i%11===0?'police':'car';
+    const footprint=cityDetails.vehicle?.(x,z,horizontal,cityDetails.carPaint(paint),kind,i%7===0)||{width:horizontal?3.9:1.75,depth:horizontal?1.75:3.9,height:1.5};
+    addRoadObstacle(x,z,footprint.width,footprint.depth,true,footprint.height);
+
 }
 
 // Mall destination at the north-east edge
@@ -321,6 +312,8 @@ addRoadObstacle(escapeX,escapeZ+7.5,3,17,true,7);
 roadObstacleBoxes[roadObstacleBoxes.length-1].npcOnly=true;
 // Simple car park
 box('MallCarPark',v3(75*WORLD_SCALE,0.01,-60*WORLD_SCALE),v3(60*WORLD_SCALE,0.03,35*WORLD_SCALE),mats.road);
+
+cityDetails.streetKit?.(roadLines,ROAD_STEP,CITY_HALF+7);
 
 function blocked(x,z,r=0.55){
     if (Math.abs(x)>CITY_HALF+7 || Math.abs(z)>CITY_HALF+7) return true;
@@ -410,8 +403,9 @@ function randomStreetPoint(){
 // Player ---------------------------------------------------------------------
 collectingStaticCity=false;
 const staticCityBatch=app.batcher.addGroup('Static city',false,48);
-for(const entity of staticCityEntities)entity.render.batchGroupId=staticCityBatch.id;
+for(const entity of staticCityEntities)if(!entity.artDetail&&!entity.artDynamic)entity.render.batchGroupId=staticCityBatch.id;
 app.batcher.generate([staticCityBatch.id]);
+cityDetails.prepare?.(staticCityEntities);
 const player = new pc.Entity('PlayerRoot');
 // Spawn on the nearby north-south road; the previous point was inside a
 // randomly sized building collision box, which could block forward movement.
@@ -495,28 +489,8 @@ function spacedSpawnPosition(position,type){
     throw new Error('No safe character spawn available');
 }
 
-function makePersonMesh(type, age='adult', gender='m', skinMat=choose(skinMaterials)){
-    const root=new pc.Entity(type+'Mesh');
-    const child = age==='child';
-    const height=child?1.12:1.68;
-    const bodyMat = type==='zombie'?choose(clothesMaterials):type==='police'?mats.police:type==='firefighter'?mats.fire:choose(clothesMaterials);
-    box('Body',v3(0,height*0.48,0),v3(child?0.42:0.52,height*0.52,child?0.28:0.34),bodyMat,root);
-    const headMat = type==='zombie'?mats.zombie:skinMat;
-    sphere('Head',v3(0,height*0.87,0),v3(child?0.30:0.34,child?0.32:0.36,child?0.30:0.34),headMat,root);
-    // Hip and shoulder pivots allow visible strides without stretching the body.
-    function limb(name,x,y,length,width,mat){
-        const joint=new pc.Entity(name+' joint');root.addChild(joint);joint.setLocalPosition(x,y,0);
-        box(name,v3(0,-length/2,0),v3(width,length,width*1.15),mat,joint);
-        return joint;
-    }
-    const legL=limb('LegL',-.13,height*.36,height*.35,.12,mats.black);
-    const legR=limb('LegR',.13,height*.36,height*.35,.12,mats.black);
-    const armL=limb('ArmL',child?-.27:-.34,height*.70,height*.40,.10,bodyMat);
-    const armR=limb('ArmR',child?.27:.34,height*.70,height*.40,.10,bodyMat);
-    if(type==='police') box('Gun',v3(0.40,height*0.48,-0.17),v3(0.08,0.08,0.35),mats.gun,root);
-    if(type==='firefighter') box('Axe',v3(0.42,height*0.50,-0.10),v3(0.08,0.65,0.10),mats.axe,root);
-    root.limbs={legL,legR,armL,armR};
-    return root;
+function makePersonMesh(type,age='adult',gender='m',skinMat=choose(skinMaterials)){
+    return characterVisuals.create(type,age,gender,skinMat);
 }
 
 function spawnAgent(type='civilian', pos=randomStreetPoint(), opts={}){
@@ -899,22 +873,8 @@ function crowdMoveBlocked(positions,x,z,currentOverlap){
     return crowdOverlap(positions,x,z,0.00001)>0.00001;
 }
 
-function animatePerson(a,dt){
-    const limbs=a.entity.limbs;if(!limbs)return;
-    if(a.fallen){
-        a.fallAngle=Math.min(84,a.fallAngle+dt*300);
-        const yaw=a.entity.getEulerAngles().y;
-        a.entity.setLocalEulerAngles(0,yaw,a.fallAngle*a.fallDirection);
-        return;
-    }
-    const moving=(a.walkDistance||0)>0.0005;
-    a.walkCycle=(a.walkCycle||0)+(moving?dt*(a.type==='zombie'?11:13):dt*3.2);
-    const stride=moving?(a.type==='zombie'?24:32):1.5;
-    const swing=Math.sin(a.walkCycle)*stride, counter=Math.cos(a.walkCycle)*stride*0.72;
-    limbs.legL.setLocalEulerAngles(swing,0,0);limbs.legR.setLocalEulerAngles(-swing,0,0);
-    const reach=a.type==='zombie'?-48:0;
-    limbs.armL.setLocalEulerAngles(reach-swing*.65,0,a.type==='zombie'?-8:0);limbs.armR.setLocalEulerAngles(reach+swing*.65,0,a.type==='zombie'?8:0);
-    a.walkDistance=0;
+function animatePerson(a,dt,now){
+    characterVisuals.update(a,dt,now,camera.getPosition(),currentQuality);
 }
 
 function updateZombie(z,dt,now){
@@ -938,7 +898,7 @@ function updateZombie(z,dt,now){
         const d=Math.sqrt(dist2(z.entity.getPosition(),targetPos));
         const withinBiteHeight=!z.target.player||targetPos.y<=z.entity.getPosition().y+0.05;
         if(d<1.15 && withinBiteHeight && now>=z.nextAttack&&!segmentHitsBuilding(z.entity.getPosition(),targetPos)){
-            z.nextAttack=now+1.25;
+            z.nextAttack=now+1.25;z.lastVisualAttack=now;
             if(z.target.player){
                 emitNoise(player.getPosition(),80,'player-scream');
                 endGame(false,'A zombie got you');
@@ -997,7 +957,7 @@ function updatePolice(p,dt,now){
         const zp=z.entity.getPosition(),d=Math.sqrt(bd); p.entity.lookAt(zp); p.facing.set(zp.x-pos.x,0,zp.z-pos.z).normalize();
         if(d<8){const retreat=v3(pos.x-(zp.x-pos.x),0,pos.z-(zp.z-pos.z));steerMove(p,retreat,dt,1.0);}
         if(d<34&&now>=p.nextShot){
-            p.nextShot=now+0.75;p.ammo--; emitNoise(pos,500,'gunshot');
+            p.nextShot=now+0.75;p.lastVisualAttack=now;p.ammo--; emitNoise(pos,500,'gunshot');
             weaponAudio.shoot('gun',Math.max(0,1-Math.sqrt(dist2(pos,player.getPosition()))/100));
             if(Math.random()<0.72){z.hp--; if(z.hp<=0)killZombie(z,'police');}
         }
@@ -1010,7 +970,7 @@ function updateFirefighter(f,dt,now){
     if(z){
         f.target=z; const zp=z.entity.getPosition(),d=Math.sqrt(bd);
         if(d>1.7) steerMove(f,zp,dt,1.0);
-        else if(now>=f.nextAttack&&!segmentHitsBuilding(pos,zp)){ f.nextAttack=now+1.1; emitNoise(pos,35,'axe'); killZombie(z,'firefighter'); }
+        else if(now>=f.nextAttack&&!segmentHitsBuilding(pos,zp)){ f.nextAttack=now+1.1;f.lastVisualAttack=now; emitNoise(pos,35,'axe'); killZombie(z,'firefighter'); }
     } else updateHuman(f,dt,now);
 }
 function killZombie(z,cause='player'){
@@ -1080,8 +1040,8 @@ function refreshVRButton(){
     document.getElementById('vrHelp').hidden=!app.xr.active;
 }
 app.xr.on('available:'+pc.XRTYPE_VR,refreshVRButton);
-app.xr.on('start',()=>{enteringVR=false;vrControls.reset();document.exitPointerLock?.();refreshVRButton();if(!started||gameOver||won)resetGame();});
-app.xr.on('end',()=>{enteringVR=false;vrControls.reset();leaveGame();refreshVRButton();});
+app.xr.on('start',()=>{applyQuality();enteringVR=false;vrControls.reset();document.exitPointerLock?.();refreshVRButton();if(!started||gameOver||won)resetGame();});
+app.xr.on('end',()=>{applyQuality();enteringVR=false;vrControls.reset();leaveGame();refreshVRButton();});
 function toggleVR(){
     if(!app.xr.supported||app.xr.active||enteringVR||!app.xr.isAvailable(pc.XRTYPE_VR))return;
     zombieAudio.enable();enteringVR=true;refreshVRButton();
@@ -1114,6 +1074,7 @@ function updateXR(dt){
 // HUD / game -----------------------------------------------------------------
 const statsEl=document.getElementById('stats'),arrowEl=document.getElementById('arrow'),distEl=document.getElementById('mallDistance'),weaponEl=document.getElementById('weapon'),messageEl=document.getElementById('message'),runStateEl=document.getElementById('runState');
 let messageUntil=0;
+let benchmarkLocalCount=0,benchmarkFrameMs=0;
 function showMessage(text,seconds=1){messageEl.textContent=text;messageUntil=performance.now()/1000+seconds;}
 function updateWeaponHud(){weaponEl.textContent=playerWeapon==='machinegun'?`MACHINE GUN · ${playerAmmo} rounds`:playerWeapon==='shotgun'?`SHOTGUN · ${playerAmmo} shots`:playerWeapon==='crossbow'?`CROSSBOW · ${playerAmmo} bolts`:playerWeapon==='gun'?`PISTOL · ${playerAmmo} rounds`:playerWeapon==='axe'?'FIREFIGHTER AXE':'UNARMED';}
 function endGame(success,text){
@@ -1140,6 +1101,7 @@ function resetGame(){
         a.speed=randomAgentSpeed(a.initialType,a.age);
         a.hp=a.initialType==='zombie'?2:1; a.biteCount=0; a.infectionAt=0; a.infected=false;
         a.eaten=false; a.fallen=false; a.fallAngle=0; a.feedingUntil=0; a.dead=false; a.nextThink=rand(0,0.5); a.nextAttack=0; a.nextShot=0;
+        a.lastVisualAttack=-99;a.walkCycle=0;a.walkDistance=0;
         a.lastScream=-99; a.heard=null; a.heardUntil=0; a.attackers.clear();a.lastActivityAt=a.type==='zombie'?performance.now()/1000:0;
         a.weapon=a.initialType==='police'?'gun':a.initialType==='firefighter'?'axe':null;
         a.ammo=a.initialType==='police'?6:0;a.deathCause=null;
@@ -1154,7 +1116,9 @@ function resetGame(){
     pickups.length=0;for(const entity of discardedWeapons)entity.destroy();discardedWeapons.length=0;
     clearBolts();if(heldShotgun)heldShotgun.enabled=false;restoreCrossbow();restoreShotgun();restoreAlleyAmmo();spareAmmo.shotgun=0;spareAmmo.crossbow=0; noises.length=0; rebuildGrid();
     player.setPosition(playerSpawn); yaw=0; pitch=0;
-    player.setEulerAngles(0,0,0); camera.setLocalEulerAngles(0,0,0);
+    benchmarkLocalCount=0;
+    if(document.getElementById('startArea')?.value==='street'){benchmarkLocalCount=arrangeStreetBenchmark(agents,ROAD_STEP,blocked);const viewX=[-42,-44,-46,-48,-30].find(x=>!blocked(x,ROAD_STEP-.6,.55))??-30;player.setPosition(viewX,0,ROAD_STEP-.6);yaw=-90;rebuildGrid();}
+    player.setEulerAngles(0,yaw,0); camera.setLocalEulerAngles(0,0,0);
     playerWeapon=null; playerAmmo=0;lastPlayerShot=-99; updateWeaponHud();
     gameOver=false; won=false; started=true; messageUntil=0;
     messageEl.textContent=''; runStateEl.textContent=''; runNoiseTimer=0;
@@ -1182,6 +1146,8 @@ function updateHUD(now){
     let humans=0,zombies=0,police=0,fire=0;
     for(const a of agents){if(a.dead)continue;if(a.type==='zombie')zombies++;else {humans++;if(a.type==='police')police++;if(a.type==='firefighter')fire++;}}
     statsEl.textContent=`Humans ${humans} · Zombies ${zombies} · Police ${police} · Firefighters ${fire}`;
+    const benchmark=document.getElementById('benchmarkPanel');benchmark.hidden=!benchmarkLocalCount||!started||app.xr.active;
+    if(!benchmark.hidden){const visible=agents.filter(a=>a.entity.visualLOD<3).length;benchmark.textContent=`HIGH STREET BENCHMARK\n${benchmarkLocalCount} actors placed · ${agents.length} simulated\n${currentQuality.label} · ${visible} within render range\nAverage frame: ${benchmarkFrameMs.toFixed(1)} ms`;}
     const pp=player.getPosition(),dx=FIRE_ESCAPE.x-pp.x,dz=FIRE_ESCAPE.z-pp.z,d=Math.hypot(dx,dz);
     distEl.textContent=`FIRE ESCAPE ${Math.round(d)} m`;
     const worldAngle=Math.atan2(dx,-dz)*180/Math.PI; const heading=app.xr.active?Math.atan2(camera.forward.x,-camera.forward.z)*180/Math.PI:yaw;
@@ -1193,11 +1159,23 @@ document.getElementById('startButton').addEventListener('click',resetGame);
 document.getElementById('restartButton').addEventListener('click',resetGame);
 document.getElementById('leaveButton').addEventListener('click',leaveGame);
 
+function applyQuality(){
+    currentQuality=resolveQuality(document.getElementById('quality').value,app.xr.active,touchControls.supported);
+    app._townPBR.setQuality(currentQuality);
+    for(const base of [mats.road,mats.pavement,mats.grass])for(const [key,m] of surfaceCache)if(key.startsWith(base.id+':')){m.diffuseMap=base.diffuseMap;m.normalMap=base.normalMap;m.glossMap=base.glossMap;m.aoMap=base.aoMap;m.metalnessMap=base.metalnessMap;m.update();}
+    camera.camera.farClip=currentQuality.draw;app.scene.fog.start=currentQuality.draw*.25;app.scene.fog.end=currentQuality.draw*.75;
+    sun.light.castShadows=currentQuality.shadows;sun.light.shadowResolution=1024;sun.light.shadowDistance=45;sun.light.shadowType=pc.SHADOW_PCF3;
+}
+document.getElementById('quality').addEventListener('change',applyQuality);
+applyQuality();
+
 // Main loop -------------------------------------------------------------------
 let accumulator=0, runNoiseTimer=0;
 app.on('update',dt=>{
     updateXR(dt);
-    if(!started||gameOver||won){updateHUD(performance.now()/1000);return;}
+    benchmarkFrameMs=benchmarkFrameMs?benchmarkFrameMs*.95+dt*1000*.05:dt*1000;
+    const frameNow=performance.now()/1000;cityDetails.update(camera.getPosition(),frameNow,currentQuality);
+    if(!started||gameOver||won){for(const a of agents)animatePerson(a,dt,frameNow);updateHUD(frameNow);return;}
     const now=performance.now()/1000;
     if(!app.xr.active&&(leftMouseFire||touchControls.state.fire)&&playerWeapon==='machinegun')playerAttack();
     updateCrossbow(dt);
@@ -1221,12 +1199,12 @@ app.on('update',dt=>{
     }
     // AI is deliberately staggered internally via nextThink timers.
     for(const a of agents){
-        if(a.dead)continue;
+        if(a.dead){animatePerson(a,dt,now);continue;}
         if(a.type==='zombie')updateZombie(a,dt,now);
         else if(a.type==='police')updatePolice(a,dt,now);
         else if(a.type==='firefighter')updateFirefighter(a,dt,now);
         else updateHuman(a,dt,now);
-        animatePerson(a,dt);
+        animatePerson(a,dt,now);
     }
     if(document.hidden||gameOver||won)zombieAudio.stop();
     else{
