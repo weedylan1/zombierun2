@@ -1,0 +1,58 @@
+html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#111; font-family:Arial,Helvetica,sans-serif; color:#fff; }
+#app { width:100%; height:100%; display:block; }
+#hud { position:fixed; inset:0; pointer-events:none; text-shadow:0 2px 4px #000; }
+#brand { position:absolute; left:18px; top:14px; font-size:22px; font-weight:900; letter-spacing:2px; }
+#brand span { font-size:11px; font-weight:400; opacity:.65; letter-spacing:1px; }
+#objective { position:absolute; left:18px; top:45px; font-size:13px; opacity:.85; }
+#compass { position:absolute; left:50%; top:14px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:2px; font-weight:800; }
+#arrow { font-size:30px; line-height:25px; transform-origin:50% 50%; }
+#mallDistance { font-size:12px; letter-spacing:1px; }
+#stats { position:absolute; right:18px; top:16px; font-size:12px; }
+#weapon { position:absolute; right:18px; bottom:42px; font-size:16px; font-weight:800; }
+#energy { position:absolute; left:18px; bottom:64px; width:160px; font-size:12px; font-weight:800; }
+#energy label { display:flex; justify-content:space-between; margin-bottom:5px; }
+#energyMeter { width:100%; height:12px; accent-color:#b9ff63; }
+#runState { position:absolute; left:50%; bottom:48px; transform:translateX(-50%); color:#b9ff63; font-size:18px; font-weight:900; letter-spacing:2px; text-shadow:0 2px 6px #000; }
+#message { position:absolute; left:50%; bottom:82px; transform:translateX(-50%); font-size:18px; font-weight:800; text-align:center; min-width:300px; }
+#crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); font-size:22px; opacity:.7; pointer-events:none; }
+#help { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); background:#0009; padding:8px 12px; border-radius:6px; font-size:12px; white-space:nowrap; }
+#vrActions { position:fixed; right:16px; bottom:78px; display:flex; gap:8px; }
+#vrActions button { background:#242924; border:1px solid #7f8; color:#fff; padding:10px 14px; border-radius:6px; font-weight:700; }
+#vrActions button:disabled { opacity:.45; cursor:default; }
+#vrHelp { position:fixed; left:18px; top:72px; max-width:340px; padding:10px; background:#000a; font-size:12px; line-height:1.6; }
+#startCard, #endCard { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(520px,calc(100vw - 40px)); background:#101410ee; border:1px solid #465246; border-radius:12px; padding:28px; text-align:center; box-shadow:0 20px 80px #000c; }
+#startCard h1, #endCard h1 { margin:0 0 10px; font-size:42px; letter-spacing:3px; }
+#startCard p, #endCard p { line-height:1.5; opacity:.85; }
+#startCard small { display:block; opacity:.55; margin-top:12px; }
+button { cursor:pointer; }
+#startButton, #restartButton, #leaveButton { margin:8px 5px 0; background:#315c35; border:1px solid #73a978; color:#fff; font-size:18px; font-weight:800; padding:12px 22px; border-radius:8px; }
+#leaveButton { background:#292e29; border-color:#778077; }
+@media (max-width:700px){ #stats{display:none} #help{white-space:normal;width:calc(100% - 60px);text-align:center;} }
+
+#gameMode { display:block; width:100%; margin:10px 0; padding:12px; background:#242924; color:#fff; border:1px solid #73a978; border-radius:6px; font-size:16px; }
+
+#app { touch-action:none; }
+#touchControls[hidden] { display:none; }
+#touchControls { position:fixed; inset:0; pointer-events:none; user-select:none; -webkit-user-select:none; }
+#touchControls button, #touchMove { pointer-events:auto; touch-action:none; }
+#touchMove { position:absolute; left:max(18px,env(safe-area-inset-left)); bottom:max(24px,env(safe-area-inset-bottom)); width:124px; height:124px; border-radius:50%; background:#152019aa; border:2px solid #c1ddb477; }
+#touchKnob { position:absolute; left:50%; top:50%; width:48px; height:48px; transform:translate(-50%,-50%); border-radius:50%; background:#9abd83bb; }
+.touch-move-label { position:absolute; left:0; right:0; bottom:8px; text-align:center; font-size:11px; pointer-events:none; }
+#touchActions { position:absolute; right:max(14px,env(safe-area-inset-right)); bottom:max(24px,env(safe-area-inset-bottom)); display:grid; grid-template-columns:68px 80px; gap:10px; }
+#touchControls button { min-height:54px; border:1px solid #94b985; border-radius:12px; background:#1b3025dd; color:#fff; font-size:13px; font-weight:800; }
+#touchFire { grid-column:1 / 3; background:#642b25dd !important; }
+#touchLeave { position:absolute; right:max(14px,env(safe-area-inset-right)); top:max(76px,env(safe-area-inset-top)); width:70px; }
+#touchLookHint { position:absolute; top:102px; left:50%; transform:translateX(-50%); font-size:12px; text-align:center; opacity:.65; }
+.touch-playing #help, .touch-playing #vrActions { display:none; }
+.touch-playing #energy { bottom:170px; left:18px; width:124px; }
+.touch-playing #weapon { bottom:174px; right:14px; font-size:13px; }
+.touch-playing #runState { bottom:168px; font-size:14px; }
+.touch-playing #message { bottom:208px; min-width:0; width:80%; font-size:15px; }
+@media (max-width:700px), (max-height:600px) { #startCard, #endCard { box-sizing:border-box; max-height:90dvh; overflow-y:auto; padding:18px; } #startCard h1 { font-size:28px; } #startCard small { font-size:11px; } #brand { font-size:16px; } #objective { top:39px; font-size:11px; } }
+
+/* Zombie Run 2: compact outbreak briefing, with existing touch visibility rules. */
+#startCard,#endCard { background:linear-gradient(145deg,#142028f5,#171b16f5);border-color:#738477;box-shadow:0 20px 80px #000b; }
+#startCard h1,#endCard h1 { color:#e9edda;text-transform:uppercase; }
+#startButton,#restartButton { background:#516c36;border-color:#b1c784; }
+#gameMode { background:#1b292c;border-color:#748678; }
+#brand span { color:#c1d99c; }

@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {traceBolt} from './src/crossbow.js';
+const zombie=(x,z,age='adult')=>({type:'zombie',age,dead:false,entity:{getPosition:()=>({x,y:0,z})}});
+const target=zombie(0,-10),from={x:0,y:1,z:0},to={x:0,y:1,z:-20};
+assert.equal(traceBolt(from,to,[target],[])?.target,target,'Aimed bolt missed zombie');
+assert.equal(traceBolt(from,{x:2,y:1,z:-20},[target],[]),null,'Missed aim auto-targeted a zombie');
+assert.equal(traceBolt({x:0,y:3,z:0},{x:0,y:3,z:-20},[target],[]),null,'Bolt above zombie should miss');
+const wall={minx:-2,maxx:2,minz:-6,maxz:-5,maxy:2};
+assert.equal(traceBolt(from,to,[target],[wall])?.target,null,'Bolt killed through obstacle');
+const close=zombie(0,-3);assert.equal(traceBolt(from,to,[target,close],[wall])?.target,close,'Closest hit should win');
+const child=zombie(0,-4,'child');assert.equal(traceBolt({x:0,y:1.4,z:0},to,[child],[]),null,'Bolt above child should miss');
+target.dead=true;assert.equal(traceBolt(from,to,[target],[]),null);target.dead=false;
+assert.equal(traceBolt(from,{x:0,y:1,z:-100},[target],[])?.target,target,'Fast bolt tunneled through target');
+// Execute the actual attack function to enforce six shots and reload timing.
+const source=fs.readFileSync('src/main.js','utf8');let now=0;
+function v3(x=0,y=0,z=0){return {x,y,z,clone(){return v3(x,y,z);}};}
+const context={Math,performance:{now:()=>now*1000},gameOver:false,won:false,playerWeapon:'crossbow',playerAmmo:6,lastPlayerShot:-99,bolts:[],mats:{axe:{}},v3,player:{getPosition:()=>v3()},crossbowAim:()=>({origin:v3(0,1,0),direction:v3(0,0,-1)}),box:()=>({lookAt(){}}),emitNoise(){},showMessage(){},updateWeaponHud(){}};
+vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function playerAttack('),source.indexOf('// XR')),context);
+context.weaponAudio={shoot(){}};context.dropEmptyWeapon=()=>{};
+for(let i=0;i<6;i++){now=i;context.playerAttack();context.playerAttack();}
+now=7;context.playerAttack();assert.equal(context.bolts.length,6);assert.equal(context.playerAmmo,0);
+console.log('PASS: exact projectile aim, misses, heights, obstacle cover, nearest hit, swept fast hits, dead targets, six bolts, and firing cooldown');
+const aimContext={app:{xr:{active:false}},camera:{getPosition:()=>v3(1,2,3),forward:v3(0,0,-1)}};
+vm.createContext(aimContext);vm.runInContext(source.slice(source.indexOf('function crossbowAim('),source.indexOf('function updateCrossbow(')),aimContext);
+assert.equal(aimContext.crossbowAim().origin.y,2);
+aimContext.app.xr.active=true;aimContext.app.xr.input={inputSources:[{handedness:'right',getOrigin:()=>v3(4,1,0),getDirection:()=>v3(1,0,0)}]};
+assert.equal(aimContext.crossbowAim().origin.x,4);assert.equal(aimContext.crossbowAim().direction.x,1);
+let killed=0,destroyed=0;
+const shotPosition={x:0,y:1,z:0,copy(p){Object.assign(this,p);}};
+const integration={Math,playerWeapon:null,heldCrossbow:null,traceBolt,v3,agents:[target],obstacleCandidates:()=>[],killZombie(a,cause){assert.equal(a,target);assert.equal(cause,'crossbow');killed++;},bolts:[{position:shotPosition,direction:v3(0,0,-1),life:3,entity:{destroy(){destroyed++;},setPosition(){}}}]};
+vm.createContext(integration);vm.runInContext(source.slice(source.indexOf('function updateCrossbow('),source.indexOf('// AI')),integration);
+integration.heldShotgun=null;
+integration.updateCrossbow(.2);assert.equal(killed,1);assert.equal(destroyed,1);assert.equal(integration.bolts.length,0);
+const pickupEntity={setPosition(){},setEulerAngles(){}};
+const resetContext={crossbowMesh:()=>pickupEntity,app:{root:{addChild(){}}},archeryPickupPosition:v3(19,.55,34),pickups:[]};
+vm.createContext(resetContext);vm.runInContext(source.slice(source.indexOf('function restoreCrossbow('),source.indexOf('function crossbowAim(')),resetContext);
+resetContext.restoreCrossbow();assert.equal(resetContext.pickups[0].type,'crossbow');assert.equal(resetContext.pickups[0].ammo,6);
+console.log('PASS: PC camera aim, right VR controller aim, real projectile update kills on collision, and fresh six-bolt store pickup');

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#161916" />
+  <title>Zombie Run 2</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="hud">
+    <div id="brand">ZOMBIE RUN <span>2 · AFTER THE SIRENS</span></div>
+    <div id="objective">Reach the mall fire escape</div>
+    <div id="compass"><span id="arrow">▲</span><span id="mallDistance">MALL 0 m</span></div>
+    <div id="stats">Humans 0 · Zombies 0 · Police 0 · Firefighters 0</div>
+    <div id="weapon">UNARMED</div>
+    <div id="runState" aria-live="off"></div>
+    <div id="energy"><label for="energyMeter">ENERGY <span id="energyValue">100%</span></label><progress id="energyMeter" max="100" value="100"></progress></div>
+    <div id="message"></div>
+  </div>
+  <div id="crosshair">+</div>
+  <div id="help">
+    <b>WASD</b> move · <b>Hold right mouse / Shift</b> sprint (uses energy) · <b>Mouse</b> look · <b>E</b> pick up weapon / ammo · <b>Click</b> use weapon · <b>V</b> VR · <b>Esc / Q</b> menu
+  </div>
+  <div id="vrActions"><button id="vrButton" disabled>ENTER VR</button><button id="exitVRButton" disabled>EXIT VR</button></div>
+  <div id="vrHelp" hidden>Left stick: move · Hold left trigger: sprint · Right grip: pick up · Right trigger: use weapon (look to aim) · B or Y: restart · A: exit VR</div>
+  <div id="touchControls" hidden aria-label="Touch game controls">
+    <div id="touchMove" role="group" aria-label="Drag to move"><span id="touchKnob"></span><span class="touch-move-label">MOVE</span></div>
+    <div id="touchActions"><button id="touchRun">RUN</button><button id="touchPickup">PICK UP</button><button id="touchFire">FIRE</button></div>
+    <button id="touchLeave">MENU</button><span id="touchLookHint">Drag the screen to look</span>
+  </div>
+  <div id="startCard">
+    <h1>Zombie Run 2</h1>
+    <p>The sirens have stopped. The city has fallen. Reach the mall fire escape and climb to safety while the infection spreads through the city. Zombies cannot climb the escape stairs. Find spare ammunition in a blocked alley.</p>
+    <label for="gameMode">Game mode</label>
+    <select id="gameMode"><option value="standard">Standard — 20 zombies, shotgun</option><option value="carnage">Carnage — 100 zombies, 100-round machine gun</option></select>
+    <p>Machine gun: hold left mouse, touch FIRE, or right VR trigger to fire.</p>
+    <button id="startButton">PLAY ON PC</button>
+    <small>PC: WASD + mouse; hold right mouse to run; Esc or Q returns to the menu. Touch: drag the left stick to move, drag the screen to look, hold RUN to sprint, tap PICK UP or FIRE, and use MENU to leave. VR: use ENTER VR with a compatible headset over HTTPS or localhost. Left stick moves; hold left trigger to sprint. Right grip picks up, right trigger uses a weapon, B or Y restarts, and A exits to the menu.</small>
+  </div>
+  <div id="endCard" style="display:none">
+    <h1 id="endTitle">Game over</h1>
+    <p id="endMessage"></p>
+    <button id="restartButton">RESTART GAME</button>
+    <button id="leaveButton">LEAVE GAME</button>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
